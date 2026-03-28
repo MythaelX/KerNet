@@ -16,6 +16,12 @@ Base de dépôt réutilisable pour déployer rapidement une infra Docker sécuri
 
 ---
 
+## Documentation
+
+- [Guide de déploiement VPS complet](docs/deploiement-vps.md) — du VPS vierge à l'infra fonctionnelle, étape par étape
+
+---
+
 ## Choisir ses services — `ops/config.sh`
 
 Avant de lancer `install.sh`, édite `ops/config.sh` pour activer ou désactiver les services :
