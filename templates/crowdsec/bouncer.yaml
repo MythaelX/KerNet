@@ -1,0 +1,24 @@
+# Configuration du bouncer iptables CrowdSec
+# Ce fichier est monté dans le conteneur iptables-bouncer.
+# Les variables CROWDSEC_LAPI_URL et CROWDSEC_LAPI_KEY sont injectées
+# via les variables d'environnement du conteneur (cf. compose.yaml).
+
+mode: iptables
+
+# L'URL et la clé sont lues depuis les variables d'environnement
+# CROWDSEC_LAPI_URL et CROWDSEC_LAPI_KEY — pas besoin de les mettre ici.
+
+update_frequency: 10s
+
+log_mode: stdout
+log_level: info
+
+# ipset utilisé pour stocker les IPs bloquées
+iptables_chains:
+  - INPUT
+  - FORWARD
+  - DOCKER-USER
+
+ipset_size: 131072
+deny_action: DROP
+deny_log: false

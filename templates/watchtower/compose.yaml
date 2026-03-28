@@ -1,0 +1,22 @@
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    container_name: kernet-watchtower
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ}
+      # Planification cron : tous les jours à 3h du matin
+      - WATCHTOWER_SCHEDULE=0 0 3 * * *
+      # Supprime les anciennes images après mise à jour
+      - WATCHTOWER_CLEANUP=true
+      # Uniquement les conteneurs avec le label watchtower.enable=true
+      - WATCHTOWER_LABEL_ENABLE=true
+      # Timeout avant de tuer un conteneur qui ne répond pas
+      - WATCHTOWER_TIMEOUT=30s
+      # Niveau de log
+      - WATCHTOWER_DEBUG=false
+      - WATCHTOWER_WARN_ON_HEAD_FAILURE=always
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Watchtower ne se met PAS à jour lui-même (pas de label watchtower.enable=true ici).
+    # C'est intentionnel : l'outil qui gère les mises à jour ne doit pas s'auto-redémarrer.

@@ -1,0 +1,5 @@
+creation_rules:
+  # Chiffre tout ce qui finit en .enc.yaml/.enc.yml dans secrets/
+  - path_regex: secrets/.*\.enc\.ya?ml$
+    encrypted_regex: '^(data|stringData|env|secrets|password|token|key|private_key|admin_token)$'
+    age: []

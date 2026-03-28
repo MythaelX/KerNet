@@ -1,0 +1,48 @@
+services:
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: kernet-crowdsec
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    ports:
+      # LAPI accessible uniquement en local (pour le bouncer en host mode)
+      - "127.0.0.1:8080:8080"
+    environment:
+      - TZ=${TZ}
+      - COLLECTIONS=${CROWDSEC_COLLECTIONS}
+    volumes:
+      - /opt/crowdsec/data:/var/lib/crowdsec/data
+      - /opt/crowdsec/config/acquis.yaml:/etc/crowdsec/acquis.yaml:ro
+      - /opt/crowdsec/config/profiles.yaml:/etc/crowdsec/profiles.yaml:ro
+      # Logs Traefik
+      - /opt/traefik/data/access.log:/var/log/traefik/access.log:ro
+      # Logs SSH (nécessite rsyslog installé sur l'hôte — voir ops/system/setup-rsyslog.sh)
+      - /var/log/auth.log:/var/log/auth.log:ro
+    networks:
+      - crowdsec_internal
+
+  iptables-bouncer:
+    image: crowdsecurity/cs-firewall-bouncer:latest
+    container_name: kernet-crowdsec-bouncer
+    restart: unless-stopped
+    # Doit tourner en mode host pour écrire les règles iptables du VPS
+    network_mode: host
+    environment:
+      - TZ=${TZ}
+      # Injectées automatiquement par l'image officielle
+      - CROWDSEC_LAPI_URL=http://127.0.0.1:8080/
+      - CROWDSEC_LAPI_KEY=${CROWDSEC_BOUNCER_KEY}
+    volumes:
+      # Fichier de config requis — les env vars BOUNCER_MODE etc. ne sont pas supportées par l'image
+      - /opt/crowdsec/config/bouncer.yaml:/etc/crowdsec/bouncers/crowdsec-firewall-bouncer.yaml:ro
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    depends_on:
+      - crowdsec
+
+networks:
+  crowdsec_internal:
+    name: crowdsec_internal
+    internal: true

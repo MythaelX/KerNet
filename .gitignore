@@ -1,0 +1,23 @@
+# Secrets / sorties locales
+.env
+.env.*
+secrets/*.yaml
+secrets/*.yml
+secrets/*.json
+secrets/*.env
+!secrets/*.enc.yaml
+!secrets/*.enc.yml
+
+# SOPS
+*.dec
+
+# Traefik
+acme.json
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Logs
+*.log

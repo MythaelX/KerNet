@@ -1,0 +1,73 @@
+services:
+  wikijs-db:
+    image: postgres:16
+    container_name: wikijs-db
+    restart: unless-stopped
+    labels:
+      # DB exclue de Watchtower : un redémarrage inopiné coupe wikijs-app
+      - com.centurylinklabs.watchtower.enable=false
+    environment:
+      - POSTGRES_DB=${WIKIJS_DB_NAME}
+      - POSTGRES_USER=${WIKIJS_DB_USER}
+      - POSTGRES_PASSWORD=${WIKIJS_DB_PASSWORD}
+      - TZ=${TZ}
+    volumes:
+      - /opt/wikijs/db:/var/lib/postgresql/data
+    networks:
+      - wikijs_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${WIKIJS_DB_USER} -d ${WIKIJS_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  wikijs-app:
+    image: requarks/wiki:2
+    container_name: wikijs-app
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    depends_on:
+      wikijs-db:
+        condition: service_healthy
+    environment:
+      - TZ=${TZ}
+      - DB_TYPE=postgres
+      - DB_HOST=wikijs-db
+      - DB_PORT=5432
+      - DB_USER=${WIKIJS_DB_USER}
+      - DB_PASS=${WIKIJS_DB_PASSWORD}
+      - DB_NAME=${WIKIJS_DB_NAME}
+    volumes:
+      - /opt/wikijs/data:/wiki/data/content
+    networks:
+      - wikijs_internal
+
+  wikijs-nginx:
+    image: nginx:1.27-alpine
+    container_name: wikijs-nginx
+    restart: unless-stopped
+    depends_on:
+      - wikijs-app
+    volumes:
+      - /opt/wikijs/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - proxy
+      - wikijs_internal
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.wikijs.rule=Host(`${WIKIJS_HOST}`)
+      - traefik.http.routers.wikijs.entrypoints=websecure
+      - traefik.http.routers.wikijs.tls=true
+      - traefik.http.routers.wikijs.tls.certresolver=letsencrypt
+      - traefik.http.routers.wikijs.middlewares=security-headers@file
+      - traefik.http.services.wikijs.loadbalancer.server.port=80
+
+networks:
+  proxy:
+    external: true
+  wikijs_internal:
+    name: wikijs_internal
+    internal: true

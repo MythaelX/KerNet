@@ -1,0 +1,75 @@
+services:
+  vaultwarden-db:
+    image: postgres:16
+    container_name: vaultwarden-db
+    restart: unless-stopped
+    labels:
+      # DB exclue de Watchtower : un redémarrage inopiné coupe vaultwarden-app
+      - com.centurylinklabs.watchtower.enable=false
+    environment:
+      - POSTGRES_DB=${VW_DB_NAME}
+      - POSTGRES_USER=${VW_DB_USER}
+      - POSTGRES_PASSWORD=${VW_DB_PASSWORD}
+      - TZ=${TZ}
+    volumes:
+      - /opt/vaultwarden/db:/var/lib/postgresql/data
+    networks:
+      - vaultwarden_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${VW_DB_USER} -d ${VW_DB_NAME}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  vaultwarden-app:
+    image: vaultwarden/server:latest
+    container_name: vaultwarden-app
+    restart: unless-stopped
+    labels:
+      - com.centurylinklabs.watchtower.enable=true
+    depends_on:
+      vaultwarden-db:
+        condition: service_healthy
+    environment:
+      - TZ=${TZ}
+      - DOMAIN=https://${VAULTWARDEN_HOST}
+      - SIGNUPS_ALLOWED=${VAULTWARDEN_SIGNUPS_ALLOWED}
+      - ADMIN_TOKEN=${VAULTWARDEN_ADMIN_TOKEN}
+      - DATABASE_URL=postgresql://${VW_DB_USER}:${VW_DB_PASSWORD}@vaultwarden-db:5432/${VW_DB_NAME}
+      - ROCKET_PORT=8080
+      # WebSocket intégré au port principal depuis v1.29 — WEBSOCKET_ENABLED déprécié
+      - LOG_LEVEL=info
+    volumes:
+      - /opt/vaultwarden/data:/data
+    networks:
+      - vaultwarden_internal
+
+  vaultwarden-nginx:
+    image: nginx:1.27-alpine
+    container_name: vaultwarden-nginx
+    restart: unless-stopped
+    depends_on:
+      - vaultwarden-app
+    volumes:
+      - /opt/vaultwarden/nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - proxy
+      - vaultwarden_internal
+    labels:
+      # Watchtower + Traefik dans un seul bloc labels (deux blocs = le 2e écrase le 1er en YAML)
+      - com.centurylinklabs.watchtower.enable=true
+      - traefik.enable=true
+      - traefik.docker.network=proxy
+      - traefik.http.routers.vaultwarden.rule=Host(`${VAULTWARDEN_HOST}`)
+      - traefik.http.routers.vaultwarden.entrypoints=websecure
+      - traefik.http.routers.vaultwarden.tls=true
+      - traefik.http.routers.vaultwarden.tls.certresolver=letsencrypt
+      - traefik.http.routers.vaultwarden.middlewares=security-headers@file,rate-limit-public@file
+      - traefik.http.services.vaultwarden.loadbalancer.server.port=80
+
+networks:
+  proxy:
+    external: true
+  vaultwarden_internal:
+    name: vaultwarden_internal
+    internal: true
