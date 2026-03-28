@@ -210,6 +210,11 @@ La convention est `220XX` où `XX` sont les derniers chiffres de l'IP du VPS.
 sudo SSH_EXTRA_PORT=22047 bash ops/ssh/setup-ports.sh
 ```
 
+> **Ubuntu 22.04+ (dont Ubuntu 25)** : SSH utilise la **socket activation** systemd.
+> Le script le détecte automatiquement et crée un override dans
+> `/etc/systemd/system/ssh.socket.d/` au lieu de modifier `sshd_config`.
+> Aucune action manuelle supplémentaire n'est nécessaire.
+
 **Ouvre un second terminal et teste AVANT de continuer :**
 ```bash
 ssh -p 22047 root@<IP_DU_VPS>
@@ -293,18 +298,30 @@ docker exec kernet-crowdsec cscli bouncers list
 
 ## Étape 14 — Fermer le port 22 (après validation du port secondaire)
 
-Une fois que tu es certain que le port secondaire fonctionne :
+Une fois que tu es certain que le port secondaire fonctionne.
 
+**Ubuntu 22.04+ / 25 (socket activation) :**
 ```bash
-# 1. Retirer Port 22 de la config sshd
-vim /etc/ssh/sshd_config.d/50-kernet-ports.conf
-# → supprime ou commente la ligne "Port 22"
-systemctl reload ssh
+# 1. Retirer Port 22 du override socket
+vim /etc/systemd/system/ssh.socket.d/kernet-ports.conf
+# → supprime la ligne "ListenStream=22"
+systemctl daemon-reload
+systemctl restart ssh.socket
 
 # 2. Supprimer la règle firewall
 iptables -D INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -m limit --limit 6/min --limit-burst 10 -j ACCEPT
 ip6tables -D INPUT -p tcp --dport 22 -m conntrack --ctstate NEW -m limit --limit 6/min --limit-burst 10 -j ACCEPT
 netfilter-persistent save
+```
+
+**Ubuntu < 22.04 (daemon classique) :**
+```bash
+# 1. Retirer Port 22 de sshd_config
+vim /etc/ssh/sshd_config.d/50-kernet-ports.conf
+# → supprime la ligne "Port 22"
+systemctl reload ssh
+
+# 2. Supprimer la règle firewall (même commandes que ci-dessus)
 ```
 
 ---
